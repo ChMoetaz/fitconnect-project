@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fitconnect-postgres
+    environment:
+      POSTGRES_DB: fitconnect
+      POSTGRES_USER: fitconnect
+      POSTGRES_PASSWORD: fitconnect
+    ports:
+      - "5432:5432"
+    volumes:
+      - fitconnect-pgdata:/var/lib/postgresql/data
+    # The backend waits on this healthcheck (see depends_on below) so it never tries to open a
+    # JDBC connection before Postgres is actually accepting queries — otherwise the app can crash
+    # on startup during the few seconds the DB container needs to initialize.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitconnect -d fitconnect"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    container_name: fitconnect-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # Host port is overridable (BACKEND_PORT in .env) so it can dodge a local instance already
+      # holding 8080; the container always listens on 8080 internally.
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      # Inside the Compose network the DB is reachable at host "postgres" (the service name),
+      # NOT localhost — localhost would point at the backend container itself. These override
+      # the values baked into application.yml via Spring Boot's relaxed env-var binding.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/fitconnect
+      SPRING_DATASOURCE_USERNAME: fitconnect
+      SPRING_DATASOURCE_PASSWORD: fitconnect
+      # Secrets are read from a local .env file (see .env.example), never hardcoded here.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Optional: enables address -> lat/lng geocoding (GeocodingService). Blank = geocoding disabled
+      # (groups/coaches are still created, lat/lng just stay null — graceful degradation).
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET}
+
+volumes:
+  fitconnect-pgdata:

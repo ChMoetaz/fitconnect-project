@@ -1,0 +1,18 @@
+target/
+*.class
+
+# IDE
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+
+# OS
+.DS_Store
+
+# Env
+.env
+
+# Local manual WebSocket chat test page (not part of the app, see Chat temps réel section)
+ws-test.html

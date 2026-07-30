@@ -1,0 +1,43 @@
+## Test configuration — shadows the main application.yml on the test classpath.
+##
+## Everything here is self-contained so tests need neither Docker/Postgres nor the real
+## GEMINI_API_KEY / JWT_SECRET environment variables:
+##  - datasource points at an in-memory H2 (PostgreSQL-compatible mode), like CommunityServiceJoinTest
+##  - jwt.secret is a throwaway value, long enough (>= 32 bytes) to pass JwtProperties.validate()
+##  - gemini.api-key is a dummy non-blank value: the WebClient call itself is always mocked in tests,
+##    so this only has to get past AiTrainingPlanService's "key is missing" guard.
+spring:
+  datasource:
+    url: jdbc:h2:mem:fitconnect;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    open-in-view: false
+
+server:
+  port: 0
+
+gemini:
+  api-key: test-gemini-key
+  model: gemini-test-model
+  base-url: http://localhost:0
+
+jwt:
+  secret: test-only-jwt-secret-please-change-me-0123456789
+  expiration-ms: 86400000
+
+# Blank on purpose: GeocodingService short-circuits on a blank key and makes NO network call, so
+# every test that creates a group/coach stays offline and fast (lat/lng just stay null). The one
+# test that exercises real geocoding (GeocodingFlowIntegrationTest) overrides this key AND mocks
+# WebClient.Builder, so it still never leaves the JVM.
+google:
+  maps:
+    api-key: ""
+    base-url: http://localhost:0

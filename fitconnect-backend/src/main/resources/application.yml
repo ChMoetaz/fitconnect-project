@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: fitconnect-backend
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/fitconnect
+    username: fitconnect
+    password: fitconnect
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+server:
+  port: 8080
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+# Gemini integration for training plan generation (see AiTrainingPlanService)
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: gemini-3-flash-preview
+  base-url: https://generativelanguage.googleapis.com/v1beta
+
+# JWT authentication (see security/JwtService). The secret must NEVER be committed:
+# it is provided via the JWT_SECRET environment variable (IntelliJ Run Configuration),
+# following the same pattern as GEMINI_API_KEY. Minimum 32 characters (256 bits) for HMAC-SHA256.
+jwt:
+  secret: ${JWT_SECRET:}
+  expiration-ms: 86400000 # 24h
+
+# Google Maps Geocoding (see GeocodingService). Like GEMINI_API_KEY / JWT_SECRET, the key is provided
+# via the GOOGLE_MAPS_API_KEY environment variable and must NEVER be committed. A blank key simply
+# disables geocoding (lat/lng stay null) — it does not break the app.
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:}
+    base-url: https://maps.googleapis.com/maps/api
