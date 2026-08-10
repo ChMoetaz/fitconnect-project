@@ -1,0 +1,59 @@
+{{- if .Values.ingress.enabled -}}
+{{- $tls := .Values.ingress.tls.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fitconnect.fullname" . }}
+  labels:
+    {{- include "fitconnect.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: {{ if $tls }}web,websecure{{ else }}web{{ end }}
+    {{- if $tls }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer | quote }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if $tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ include "fitconnect.fullname" . }}-tls
+    {{- if .Values.ingress.apiHost }}
+    - hosts:
+        - {{ .Values.ingress.apiHost | quote }}
+      secretName: {{ include "fitconnect.fullname" . }}-api-tls
+    {{- end }}
+  {{- end }}
+  rules:
+    - host: {{ required "ingress.host is required" .Values.ingress.host | quote }}
+      http:
+        paths:
+          {{- range $p := list "/api" "/ws" "/swagger-ui" "/v3/api-docs" }}
+          - path: {{ $p }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fitconnect.backend.fullname" $ }}
+                port:
+                  number: 8080
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fitconnect.frontend.fullname" . }}
+                port:
+                  number: 80
+    {{- if .Values.ingress.apiHost }}
+    - host: {{ .Values.ingress.apiHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "fitconnect.backend.fullname" . }}
+                port:
+                  number: 8080
+    {{- end }}
+{{- end }}

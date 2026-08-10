@@ -1,0 +1,6 @@
+.DS_Store
+.git/
+*.tmp
+*.bak
+values-secret.yaml
+secrets*.yaml
