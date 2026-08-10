@@ -1,0 +1,15 @@
+ingress:
+  host: 158.158.75.139.nip.io
+  apiHost: api.158.158.75.139.nip.io
+  tls:
+    enabled: true
+    clusterIssuer: fitconnect-ca
+
+backend:
+  replicas: 2
+frontend:
+  replicas: 2
+
+postgres:
+  persistence:
+    size: 5Gi
