@@ -1,0 +1,23 @@
+# Secrets — never commit real credentials
+k8s/values-secret*.yaml
+!k8s/values-secret*.example.yaml
+infra/.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / tooling
+.idea
+.vscode
+*.iml
+.claude
+
+# Logs
+*.log
