@@ -8,7 +8,7 @@ FitConnect is a digital fitness platform combining three things existing apps (F
 
 University project (Masterprojekt / exposé) — Medieninformatik, BHT Berlin.
 
-**Authors**: Moetez Cherni & Amen Hajlaoui
+**Authors**: Moetez Cherni
 
 ---
 
