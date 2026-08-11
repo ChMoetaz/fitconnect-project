@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]
+    branches: [dev, main]
   workflow_dispatch: {}
 
 concurrency:
@@ -19,6 +19,10 @@ jobs:
       sha: ${{ steps.v.outputs.sha }}
       backend_image: ${{ steps.v.outputs.backend_image }}
       frontend_image: ${{ steps.v.outputs.frontend_image }}
+      env: ${{ steps.v.outputs.env }}
+      namespace: ${{ steps.v.outputs.namespace }}
+      values_file: ${{ steps.v.outputs.values_file }}
+      api_url: ${{ steps.v.outputs.api_url }}
     steps:
       - id: v
         run: |
@@ -26,6 +30,17 @@ jobs:
           echo "sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
           echo "backend_image=${REGISTRY}/${owner}/fitconnect-backend" >> "$GITHUB_OUTPUT"
           echo "frontend_image=${REGISTRY}/${owner}/fitconnect-frontend" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            echo "env=prod" >> "$GITHUB_OUTPUT"
+            echo "namespace=fitconnect-prod" >> "$GITHUB_OUTPUT"
+            echo "values_file=values-prod.yaml" >> "$GITHUB_OUTPUT"
+            echo "api_url=https://fitconnect-moetaz.duckdns.org" >> "$GITHUB_OUTPUT"
+          else
+            echo "env=dev" >> "$GITHUB_OUTPUT"
+            echo "namespace=fitconnect-dev" >> "$GITHUB_OUTPUT"
+            echo "values_file=values-dev.yaml" >> "$GITHUB_OUTPUT"
+            echo "api_url=https://dev.fitconnect-moetaz.duckdns.org" >> "$GITHUB_OUTPUT"
+          fi
 
   test-backend:
     runs-on: ubuntu-latest
@@ -78,7 +93,7 @@ jobs:
           push: true
           tags: |
             ${{ needs.setup.outputs.backend_image }}:${{ needs.setup.outputs.sha }}
-            ${{ needs.setup.outputs.backend_image }}:latest
+            ${{ needs.setup.outputs.backend_image }}:${{ needs.setup.outputs.env }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -88,13 +103,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    strategy:
-      matrix:
-        include:
-          - env: dev
-            api_url: https://dev.fitconnect-moetaz.duckdns.org
-          - env: prod
-            api_url: https://fitconnect-moetaz.duckdns.org
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -108,16 +116,16 @@ jobs:
           context: ./fitconnect-frontend
           push: true
           build-args: |
-            VITE_API_BASE_URL=${{ matrix.api_url }}
+            VITE_API_BASE_URL=${{ needs.setup.outputs.api_url }}
             VITE_GOOGLE_MAPS_API_KEY=${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
-          tags: ${{ needs.setup.outputs.frontend_image }}:${{ needs.setup.outputs.sha }}-${{ matrix.env }}
+          tags: ${{ needs.setup.outputs.frontend_image }}:${{ needs.setup.outputs.sha }}-${{ needs.setup.outputs.env }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-dev:
+  deploy:
     needs: [setup, build-backend, build-frontend]
     runs-on: ubuntu-latest
-    environment: dev
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'dev' }}
     steps:
       - uses: actions/checkout@v4
       - uses: appleboy/scp-action@v0.1.7
@@ -125,7 +133,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: "k8s/fitconnect/**,k8s/values-dev.yaml,k8s/values-prod.yaml,k8s/cluster-issuer.yaml"
+          source: "k8s/fitconnect/**,k8s/values-dev.yaml,k8s/values-prod.yaml,k8s/cluster-issuer.yaml,k8s/letsencrypt-issuer.yaml"
           target: "~/fitconnect"
           overwrite: true
       - uses: appleboy/ssh-action@v1.2.0
@@ -138,48 +146,14 @@ jobs:
             export PATH=$PATH:/usr/local/bin
             export KUBECONFIG=$HOME/.kube/config
             cd ~/fitconnect
-            helm upgrade --install fitconnect-dev ./k8s/fitconnect \
-              --namespace fitconnect-dev --create-namespace \
-              -f k8s/values-dev.yaml -f k8s/values-secret-dev.yaml \
+            helm upgrade --install fitconnect-${{ needs.setup.outputs.env }} ./k8s/fitconnect \
+              --namespace ${{ needs.setup.outputs.namespace }} --create-namespace \
+              -f k8s/${{ needs.setup.outputs.values_file }} \
+              -f k8s/values-secret-${{ needs.setup.outputs.env }}.yaml \
               --set backend.image.repository=${{ needs.setup.outputs.backend_image }} \
               --set backend.image.tag=${{ needs.setup.outputs.sha }} \
               --set frontend.image.repository=${{ needs.setup.outputs.frontend_image }} \
-              --set frontend.image.tag=${{ needs.setup.outputs.sha }}-dev \
+              --set frontend.image.tag=${{ needs.setup.outputs.sha }}-${{ needs.setup.outputs.env }} \
               --wait --timeout 5m
-            kubectl -n fitconnect-dev rollout status deploy/fitconnect-dev-backend --timeout=180s
-            kubectl -n fitconnect-dev rollout status deploy/fitconnect-dev-frontend --timeout=180s
-
-  deploy-prod:
-    needs: [setup, deploy-dev]
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-      - uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: "k8s/fitconnect/**,k8s/values-dev.yaml,k8s/values-prod.yaml,k8s/cluster-issuer.yaml"
-          target: "~/fitconnect"
-          overwrite: true
-      - uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            set -euo pipefail
-            export PATH=$PATH:/usr/local/bin
-            export KUBECONFIG=$HOME/.kube/config
-            cd ~/fitconnect
-            helm upgrade --install fitconnect-prod ./k8s/fitconnect \
-              --namespace fitconnect-prod --create-namespace \
-              -f k8s/values-prod.yaml -f k8s/values-secret-prod.yaml \
-              --set backend.image.repository=${{ needs.setup.outputs.backend_image }} \
-              --set backend.image.tag=${{ needs.setup.outputs.sha }} \
-              --set frontend.image.repository=${{ needs.setup.outputs.frontend_image }} \
-              --set frontend.image.tag=${{ needs.setup.outputs.sha }}-prod \
-              --wait --timeout 5m
-            kubectl -n fitconnect-prod rollout status deploy/fitconnect-prod-backend --timeout=180s
-            kubectl -n fitconnect-prod rollout status deploy/fitconnect-prod-frontend --timeout=180s
+            kubectl -n ${{ needs.setup.outputs.namespace }} rollout status deploy/fitconnect-${{ needs.setup.outputs.env }}-backend --timeout=180s
+            kubectl -n ${{ needs.setup.outputs.namespace }} rollout status deploy/fitconnect-${{ needs.setup.outputs.env }}-frontend --timeout=180s
