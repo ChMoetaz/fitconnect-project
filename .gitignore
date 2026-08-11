@@ -21,3 +21,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Archives / build artifacts
+*.tar.gz

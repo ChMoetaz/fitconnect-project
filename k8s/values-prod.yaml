@@ -1,9 +1,9 @@
 ingress:
-  host: 158.158.75.139.nip.io
-  apiHost: api.158.158.75.139.nip.io
+  host: fitconnect-moetaz.duckdns.org
+  apiHost: api.fitconnect-moetaz.duckdns.org
   tls:
     enabled: true
-    clusterIssuer: fitconnect-ca
+    clusterIssuer: letsencrypt-prod
 
 backend:
   replicas: 2
