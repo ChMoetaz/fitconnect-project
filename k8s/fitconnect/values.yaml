@@ -1,0 +1,60 @@
+imagePullSecrets: []
+
+ingress:
+  enabled: true
+  className: traefik
+  host: ""
+  apiHost: ""
+  tls:
+    enabled: false
+    clusterIssuer: fitconnect-ca
+
+postgres:
+  image: postgres:16-alpine
+  auth:
+    database: fitconnect
+    username: fitconnect
+    password: ""
+  persistence:
+    size: 5Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+backend:
+  replicas: 1
+  image:
+    repository: ghcr.io/chmoetaz/fitconnect-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  javaToolOptions: "-XX:MaxRAMPercentage=75.0"
+  secrets:
+    jwtSecret: ""
+    geminiApiKey: ""
+    googleMapsApiKey: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+frontend:
+  replicas: 1
+  image:
+    repository: ghcr.io/chmoetaz/fitconnect-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi

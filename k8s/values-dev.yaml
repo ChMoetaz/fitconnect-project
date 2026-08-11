@@ -1,0 +1,15 @@
+ingress:
+  host: dev.fitconnect-moetaz.duckdns.org
+  apiHost: api-dev.fitconnect-moetaz.duckdns.org
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+
+backend:
+  replicas: 1
+frontend:
+  replicas: 1
+
+postgres:
+  persistence:
+    size: 2Gi

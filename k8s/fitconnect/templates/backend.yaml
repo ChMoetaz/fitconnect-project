@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fitconnect.backend.fullname" . }}
+  labels:
+    {{- include "fitconnect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+data:
+  SPRING_DATASOURCE_URL: {{ include "fitconnect.datasourceUrl" . | quote }}
+  JAVA_TOOL_OPTIONS: {{ .Values.backend.javaToolOptions | quote }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "fitconnect.backend.fullname" . }}
+  labels:
+    {{- include "fitconnect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+type: Opaque
+stringData:
+  SPRING_DATASOURCE_USERNAME: {{ .Values.postgres.auth.username | quote }}
+  SPRING_DATASOURCE_PASSWORD: {{ required "postgres.auth.password is required" .Values.postgres.auth.password | quote }}
+  JWT_SECRET: {{ required "backend.secrets.jwtSecret is required" .Values.backend.secrets.jwtSecret | quote }}
+  GEMINI_API_KEY: {{ .Values.backend.secrets.geminiApiKey | quote }}
+  GOOGLE_MAPS_API_KEY: {{ .Values.backend.secrets.googleMapsApiKey | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fitconnect.backend.fullname" . }}
+  labels:
+    {{- include "fitconnect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  selector:
+    {{- include "fitconnect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fitconnect.backend.fullname" . }}
+  labels:
+    {{- include "fitconnect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "fitconnect.labels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        {{- include "fitconnect.labels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+      annotations:
+        checksum/config: {{ toYaml (dict "url" (include "fitconnect.datasourceUrl" .) "opts" .Values.backend.javaToolOptions "secrets" .Values.backend.secrets "dbUser" .Values.postgres.auth.username "dbPass" .Values.postgres.auth.password) | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: {{ include "fitconnect.backend.fullname" . }}
+            - secretRef:
+                name: {{ include "fitconnect.backend.fullname" . }}
+          startupProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 4
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
