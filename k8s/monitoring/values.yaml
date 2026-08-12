@@ -1,0 +1,50 @@
+alertmanager:
+  enabled: false
+
+grafana:
+  defaultDashboardsTimezone: browser
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    hosts:
+      - grafana.fitconnect-moetaz.duckdns.org
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - grafana.fitconnect-moetaz.duckdns.org
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    resources:
+      requests:
+        cpu: 100m
+        memory: 400Mi
+      limits:
+        memory: 900Mi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 8Gi
+
+# k3s ne les expose pas séparément -> on désactive pour éviter des cibles "down"
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false
