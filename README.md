@@ -10,6 +10,8 @@ University project (Masterprojekt / exposé) — Medieninformatik, BHT Berlin.
 
 **Authors**: Moetez Cherni
 
+> Deployment, infrastructure and CI/CD are documented separately in **[DEVOPS_README.md](DEVOPS_README.md)** and **[concept.md](concept.md)**.
+
 ---
 
 ## Project structure
