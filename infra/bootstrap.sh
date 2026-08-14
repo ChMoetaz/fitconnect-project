@@ -27,3 +27,4 @@ helm upgrade --install cert-manager jetstack/cert-manager \
   --wait
 
 kubectl apply -f "${REPO_DIR}/k8s/cluster-issuer.yaml"
+kubectl apply -f "${REPO_DIR}/k8s/letsencrypt-issuer.yaml"

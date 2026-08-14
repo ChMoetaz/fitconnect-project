@@ -3,6 +3,20 @@ import sys
 
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
+from azure.mgmt.compute.models import (
+    HardwareProfile,
+    ImageReference,
+    LinuxConfiguration,
+    ManagedDiskParameters,
+    NetworkInterfaceReference,
+    NetworkProfile,
+    OSDisk,
+    OSProfile,
+    SshConfiguration,
+    SshPublicKey,
+    StorageProfile,
+    VirtualMachine,
+)
 from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.resource import ResourceManagementClient
 
@@ -15,7 +29,7 @@ def env(name, default=None, required=False):
 
 
 SUBSCRIPTION_ID = env("AZURE_SUBSCRIPTION_ID", required=True)
-LOCATION = env("AZURE_LOCATION", "westeurope")
+LOCATION = env("AZURE_LOCATION", "spaincentral")
 RESOURCE_GROUP = env("AZURE_RESOURCE_GROUP", "fitconnect-rg")
 
 VNET_NAME = env("AZURE_VNET_NAME", "fitconnect-vnet")
@@ -25,7 +39,7 @@ NSG_NAME = env("AZURE_NSG_NAME", "fitconnect-nsg")
 NIC_NAME = env("AZURE_NIC_NAME", "fitconnect-nic")
 VM_NAME = env("AZURE_VM_NAME", "fitconnect-vm")
 
-VM_SIZE = env("AZURE_VM_SIZE", "Standard_B2s")
+VM_SIZE = env("AZURE_VM_SIZE", "Standard_B2as_v2")
 ADMIN_USERNAME = env("AZURE_ADMIN_USERNAME", "moetaz")
 SSH_PUBLIC_KEY_PATH = env("AZURE_SSH_PUBLIC_KEY_PATH", os.path.expanduser("~/.ssh/id_rsa.pub"))
 
@@ -116,40 +130,42 @@ def main():
     ).result()
 
     print(f"vm {VM_NAME}")
+    vm_params = VirtualMachine(
+        location=LOCATION,
+        hardware_profile=HardwareProfile(vm_size=VM_SIZE),
+        storage_profile=StorageProfile(
+            image_reference=ImageReference(
+                publisher="Canonical",
+                offer="ubuntu-24_04-lts",
+                sku="server",
+                version="latest",
+            ),
+            os_disk=OSDisk(
+                create_option="FromImage",
+                managed_disk=ManagedDiskParameters(storage_account_type="Standard_LRS"),
+            ),
+        ),
+        os_profile=OSProfile(
+            computer_name=VM_NAME,
+            admin_username=ADMIN_USERNAME,
+            linux_configuration=LinuxConfiguration(
+                disable_password_authentication=True,
+                ssh=SshConfiguration(
+                    public_keys=[
+                        SshPublicKey(
+                            path=f"/home/{ADMIN_USERNAME}/.ssh/authorized_keys",
+                            key_data=ssh_key,
+                        )
+                    ]
+                ),
+            ),
+        ),
+        network_profile=NetworkProfile(
+            network_interfaces=[NetworkInterfaceReference(id=nic.id)]
+        ),
+    )
     compute_client.virtual_machines.begin_create_or_update(
-        RESOURCE_GROUP, VM_NAME,
-        {
-            "location": LOCATION,
-            "hardware_profile": {"vm_size": VM_SIZE},
-            "storage_profile": {
-                "image_reference": {
-                    "publisher": "Canonical",
-                    "offer": "0001-com-ubuntu-server-jammy",
-                    "sku": "22_04-lts-gen2",
-                    "version": "latest",
-                },
-                "os_disk": {
-                    "create_option": "FromImage",
-                    "managed_disk": {"storage_account_type": "Standard_LRS"},
-                },
-            },
-            "os_profile": {
-                "computer_name": VM_NAME,
-                "admin_username": ADMIN_USERNAME,
-                "linux_configuration": {
-                    "disable_password_authentication": True,
-                    "ssh": {
-                        "public_keys": [
-                            {
-                                "path": f"/home/{ADMIN_USERNAME}/.ssh/authorized_keys",
-                                "key_data": ssh_key,
-                            }
-                        ]
-                    },
-                },
-            },
-            "network_profile": {"network_interfaces": [{"id": nic.id}]},
-        },
+        RESOURCE_GROUP, VM_NAME, vm_params
     ).result()
 
     ip = network_client.public_ip_addresses.get(RESOURCE_GROUP, PUBLIC_IP_NAME)
