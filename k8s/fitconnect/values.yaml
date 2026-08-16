@@ -32,7 +32,7 @@ backend:
     repository: ghcr.io/chmoetaz/fitconnect-backend
     tag: latest
     pullPolicy: IfNotPresent
-  javaToolOptions: "-XX:MaxRAMPercentage=75.0"
+  javaToolOptions: "-XX:MaxRAMPercentage=70.0"
   secrets:
     jwtSecret: ""
     geminiApiKey: ""
@@ -40,10 +40,10 @@ backend:
   resources:
     requests:
       cpu: 250m
-      memory: 512Mi
+      memory: 768Mi
     limits:
       cpu: "1"
-      memory: 1Gi
+      memory: 1536Mi
 
 frontend:
   replicas: 1
